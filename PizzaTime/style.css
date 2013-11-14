@@ -1,0 +1,477 @@
+
+/*
+    Webdev 2 :: Pizza Time :: Style (CSS 3)
+    by Lee Coakley
+    November 2012
+    
+    
+    
+    === Colour palette ===
+     BG:        rgb(24,8,16)     // Dark wine
+     InnerBG:   rgb(44,16,28)    // Lighter BG
+     BoxBG:     rgb(36,12,22)    // Darker, but not as dark as BG
+     Delim:     rgb(79,17,51)    // Purply
+     Button:    rgb(193,29,68)   // Cherry red
+     Active:    rgb(251,112,85)  // Low saturation orange
+     Select:    rgb(239,194,55)  // Gold
+     Off-white: rgb(253,249,247)
+     
+     TODO: add glow effects using boxShadow on DnD dropzone
+*/
+
+
+
+body
+{
+    font-family:      "calibri", "trebuchet ms", "helvetica", sans-serif;
+    background-color: rgb(24,8,16);
+    color:            white;
+}
+
+
+
+
+
+#pageOuterContainer
+{
+    width:  720px;
+    margin: auto;
+    
+    background-color: rgb(44,16,28);
+    color:            rgb(253,249,247);
+    border:           solid 6px rgb(79,17,51);
+    border-radius:    32px;
+}
+
+
+
+
+
+#pageInnerContainer
+{
+    margin-left:  1em;
+    margin-right: 1em;
+}
+
+
+
+
+
+header
+{
+    display:       block;
+    border-bottom: 5px solid rgb(79,17,51);
+}
+
+
+header > h1
+{
+    margin: -0.1em; /* Compact it a bit */
+    
+    font-size:    6em;
+    font-variant: small-caps;
+    font-weight:  bold;
+    text-align:   center;
+    
+    color:       rgb(251,112,85);
+    text-shadow: 0px 0px  16px  black;
+}
+    
+
+
+
+
+#instructions
+{
+    margin-bottom: 1em;
+    font-weight:   bold;
+    text-shadow:   0px 0px  3px  black;
+    border-bottom: 5px solid rgb(79,17,51);
+}
+
+#instructions > p > em /* Instruction text */
+{
+    padding-left: 0.5em;
+    font-size:    1.25em;
+    font-style:   normal;
+}
+
+#instructions > p > span /* (i) symbol */
+{
+    display: inline-block;
+    width:   1em;
+    height:  1em;
+    
+    text-align:  center;
+    line-height: 0.95em;
+    font-size:   2em;
+    font-weight: bold;
+    text-shadow: 0px 0px  8px  white; /*glow*/
+    
+    border:        0.15em solid;
+    border-radius: 1em; /* == width == height */
+}
+
+
+
+#pizzaDisplay
+{
+    position:         relative;
+    float:            left;
+    width:            400px;
+    height:           400px;
+    background-color: rgb(36,12,22);
+    
+    border:        solid 3px rgb(193,29,68);
+    border-radius: 32px;
+    box-shadow:    inset  0px 0px  16px 4px  black;  /* mode  xoff yoff  radiusFade, radiusSolid */
+}
+
+#pizzaDisplay > .vis
+{
+    position: absolute;
+    width:    400px;
+    height:   400px;
+    
+    background-size:     100%;
+    background-repeat:   no-repeat;
+    background-position: center;
+}
+
+#dndDropTarget
+{
+    position: absolute;
+    width:    400px;
+    height:   400px;
+}
+
+
+
+#visBase            { background-image: url('images/pizzabase.png');            }
+#vistoppingJalapeno { background-image: url('images/pizzatoppingJalapeno.png'); }
+#vistoppingChicken  { background-image: url('images/pizzatoppingChicken.png');  }
+#vistoppingChilli   { background-image: url('images/pizzatoppingChilli.png');   }
+#vistoppingCheese   { background-image: url('images/pizzatoppingCheese.png');   }
+#vistoppingOnion    { background-image: url('images/pizzatoppingOnion.png');    }
+#vistoppingMushroom { background-image: url('images/pizzatoppingMushroom.png'); }
+
+#toppingJalapeno { background-image: url('images/toppingJalapenos.jpg'); }
+#toppingChicken  { background-image: url('images/toppingChicken.jpg');   }
+#toppingChilli   { background-image: url('images/toppingChillies.jpg');  }
+#toppingCheese   { background-image: url('images/toppingCheese.jpg');    }
+#toppingOnion    { background-image: url('images/toppingOnions.jpg');    }
+#toppingMushroom { background-image: url('images/toppingMushrooms.jpg'); }
+
+#baseSize9  { background-image: url('images/baseSize9.png');  }
+#baseSize12 { background-image: url('images/baseSize12.png'); }
+#baseSize16 { background-image: url('images/baseSize16.png'); }
+
+
+
+.toppingContainer
+{
+    float: right;
+    clear: right;
+}
+
+
+
+.topdel,
+.topping
+{
+    float:      left;
+    margin-top: 12px;
+}
+
+
+
+.topdel
+{
+    float:       left;
+    width:       48px;
+    height:      48px;
+    margin-left: 12px;
+    
+    opacity:          0.25;
+    border:           solid 3px rgb(193,29,68);
+    border-radius:    24px;
+    background-image: url('images/deleteTopping.png');
+}
+
+
+
+.topdel:hover,
+.topping:hover,
+.baseSize:hover
+{
+    border-color: rgb(251,112,85);
+    box-shadow:   inset  0px 0px  2px 2px  black,  0px 0px  8px 1px rgb(251,112,85);
+}
+
+.topdel:hover
+{
+    background-image: url('images/deleteToppingHover.png');
+}
+
+
+
+.topdel,
+.topping,
+.baseSize
+{
+    border:        solid 3px rgb(193,29,68);
+    border-radius: 24px;
+    box-shadow:    inset  0px  0px  4px  4px  black;
+}
+
+
+
+.topping,
+.baseSize
+{
+    float:  left;
+    width:  192px;
+    height: 48px;
+    
+    cursor: move;
+
+    user-drag:         element; /* W3C */
+    -moz-user-drag:    element; /* Firefox */
+    -webkit-user-drag: element; /* Chrome and Safari */
+    -ms-user-drag:     element; /* IE */
+    
+    user-select:         none; /* W3C */
+    -moz-user-select:    none; /* Firefox */
+    -webkit-user-select: none; /* Chrome and Safari */
+    -ms-user-select:     none; /* IE */
+}
+
+
+
+.baseSize
+{
+    float:         left;
+    clear:         right;
+    width:         112px;
+    height:        48px;
+    margin-left:   5px;
+    margin-top:    12px;
+    margin-right:  12px;
+    margin-bottom: 24px;
+    
+    text-shadow:         0px 0px  8px  black;
+    background-repeat:   no-repeat;
+    background-position: right top;
+}
+
+.baseSize > span /* Inner text */
+{
+    padding-left: 0.35em;
+    font-weight:  bold;
+    font-size:    2.5em;
+    line-height:  1.1em;
+}
+
+
+
+
+
+#price /* Dynamic price */
+{
+    visibility:  hidden;
+
+    float:       left;
+    margin-left: 1em;
+    
+    text-align:  right;
+    font-weight: bold;
+    font-size:   3.5em;
+    text-shadow: 0px 0px  16px  black;
+}
+
+
+
+
+
+.floatSplitter
+{
+    clear: both;
+}
+
+
+
+
+
+form
+{
+    padding-top:   1em;
+    margin-bottom: 2em;
+    border-top:    5px solid rgb(79,17,51);
+}
+
+
+
+form #formLabels
+{
+    float:         left;
+    padding-right: 0.25em;
+    text-align:    right;
+}
+
+
+
+form #formInputs
+{
+    float: left;
+}
+
+
+
+form .feedback
+{
+    font-weight: normal;
+    font-style:  italic;
+    font-size:   0.5em;
+    color:       rgb(255,0,0);
+    text-shadow: 0px 0px  3px  black;
+}
+
+
+
+form label
+{
+    display: block;
+    padding: 0.25em;
+    
+    font-size:   0.5em;
+    font-weight: bold;
+}
+
+
+
+form .textInput
+{
+    width:   240px;
+    padding: 0.25em;
+
+    font-family: inherit; /* Uses system font otherwise. */
+    font-weight: normal;
+    
+    background-color: rgb(36,12,22);
+    color:            rgb(253,249,247);
+    border:           3px solid rgb(193,29,68);
+    border-radius:    8px;
+    box-shadow:       inset  0px 0px  2px 2px  black;
+}
+
+form .textInput:hover, /* Made more specific to override :invalid */
+form .textInput:focus
+{
+    background-color: rgb(55,15,40);
+    border-color:     rgb(251,112,85);
+}
+
+form .textInput:focus
+{
+    box-shadow:       inset  0px 0px  2px 2px  rgba(0,0,0,0.5);
+    background-color: rgb(55,15,40);
+    border-color:     rgb(239,194,55);
+}
+
+form .textInput:invalid /* HTML5 validation */
+{
+    border-color: red;
+}
+
+
+
+form > fieldset
+{
+    padding-bottom: 0.8em;
+    font-size:      2.5em;
+    line-height:    0.75em;
+    font-weight:    bold;
+    text-shadow:    0px 0px  10px  black;
+    border:         5px solid rgb(79,17,51);
+    border-radius:  16px;
+}
+
+
+
+#hiddenOrderFields
+{
+    display: none;
+}
+
+
+
+.feedbackContainer
+{
+    position: relative; /* Makes absolute positioned child elements relative to this one */
+}
+
+
+
+.feedbackContainer > img,
+.feedbackContainer > img,
+.feedbackContainer > img
+{
+    visibility: hidden;
+    position:   absolute;
+    left:       +5.4em;
+    top:        +0.38em;
+}
+
+#emailImage,
+#loyaltyCardImage
+{
+    left: +5.7em;
+}
+
+
+
+#submitButton
+{
+    float:         right;
+    clear:         both;
+    width:         192px;
+    margin-top:   -0.82em; /* Overlap fieldset border. */
+    margin-right:  1em;
+
+    font-family: inherit; /* Uses system font otherwise. */
+    font-weight: bold;
+    font-size:   2.5em;
+    
+    color:            rgb(253,249,247);
+    background-color: rgb(79,17,51);
+    border:           5px solid rgb(193,29,68);
+    border-radius:    12px;
+    box-shadow:       0px 0px  8px 2px  rgba(0,0,0,0.35);
+}
+
+#submitButton:hover,
+#submitButton:focus
+{
+    color:            rgb(255,255,255);
+    background-color: rgb(90,27,61);
+    border-color:     rgb(239,194,55);
+    box-shadow:       0px 0px  16px 2px  rgba(239,194,55,0.25);
+}
+
+#submitButton:active
+{
+    color:            black;
+    background-color: rgb(239,194,55);
+    border-color:     rgb(90,27,61);
+    box-shadow:       0px 0px  16px 2px  rgba(193,29,68,0.75);
+}
+
+
+
+
+
+
+
+
+
+
