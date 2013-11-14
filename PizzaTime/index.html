@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+
+<!--
+    Webdev 2 :: Pizza Time (HTML5)
+    by Lee Coakley
+    November 2012
+    
+    Tested in:
+    - Firefox 12 and 17
+    - Chrome 21 and 23
+-->
+
+
+
+<html lang="IE">
+    
+<head>
+    <title>Pizza Time</title>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="style.css"          type="text/css"  />
+    <link rel="icon"       href="images/ico16px.png" type="image/png" />
+    
+    <!--
+        REQUIREMENT                   IMPLEMENTED
+        
+        + Basics
+          - Valid HTML5:              yes
+          - Form submits correctly:   yes
+          - Show price:               yes
+          - No libraries:             yes
+          - Pizza visualisation:      yes
+        
+        + Validation
+          - name:                     yes
+          - address:                  yes
+          - phone:                    yes
+          - email:                    yes
+          - Loyalty card:             yes
+          - CC:                       yes
+      
+        + Extras
+          - Advanced pizza vis:       yes
+          - Cookie memory:            yes
+          - Awesome style:            yes :D
+          - HTML5 drag and drop:      yes
+          - HTML5 validation:         yes
+          - Regex validation:         yes
+          - Phone +353:               yes
+          - Phone brackets:           yes
+          - Custom loyalty card:      yes
+          - CIT email discount:       yes
+          - Non-pizza items:          no
+          - Dynamic CC type feedback: yes
+          - Dynamic price update:     yes
+          - Animated price update:    yes
+          - Hand-drawn pizza images:  yes
+          - Animated page elements:   no
+          
+    -->
+    
+    <script type="text/javascript">
+    //<![CDATA[
+    
+    
+    
+    // Element IDs used for DnD and pizza state.
+    // Bases and toppings must be contiguous in the array
+    // and must match the displayed per-group order.
+    var pizzaPartArray  = [ "baseSize9",
+                            "baseSize12",
+                            "baseSize16", 
+                            "toppingJalapeno",
+                            "toppingChicken",
+                            "toppingChilli",
+                            "toppingCheese",
+                            "toppingOnion",
+                            "toppingMushroom" ];
+    
+    
+    
+    // Arrays of element IDs for convenient looping
+    var inputIdArray = [ "name",
+                         "address",
+                         "phone",
+                         "email",
+                         "loyaltyCard",
+                         "creditCard" ];
+    
+    
+    
+    // Element references
+    var elemDndDropTarget = undefined;
+    var elemPizzaDisplay  = undefined;
+    var elemPrice         = undefined;
+    
+    
+    
+    // Colours
+    var colourNormal   = "rgb(193,29,68)";
+    var colourActive   = "rgb(251,112,85)";
+    var colourSelect   = "rgb(239,194,55)";
+    var colourGood     = "rgb(32,224,32)";
+    var colourBad      = "rgb(255,0,0)";
+    var colourBadInner = "rgba(255,0,0,0.25)";
+    var alphaEnable    = "1.0";
+    var alphaDisable   = "0.25";
+    
+    
+    
+    // Feedback/UI images.  Feedback is supposed to be fast, so they're preloaded.
+    var imageUiDelHover     = imagePreload( "images/deleteToppingHover.png" );
+    var imageCardVisa       = imagePreload( "images/cardVisa.png"       );
+    var imageCardMastercard = imagePreload( "images/cardMastercard.png" );
+    var imageCardDiscover   = imagePreload( "images/cardDiscover.png"   );
+    var imageCardMystery    = imagePreload( "images/cardMystery.png"    );
+    
+    
+    
+    // Persistent state (using cookies)
+    var cookieRememberDays   = 365;
+    var cookieNameOrderState = "orderState";
+    var cookieNameFormState  = "formState";
+    
+    
+    // TODO: if you get enough time, make a list of previous orders
+    var stateOrderHistory = [];
+    
+    
+    
+    // Order state
+    var stateOrder = [ false,    // Base 9"     // NOTE: Order of array must match pizzaPartArray!
+                       false,    // Base 12"
+                       false,    // Base 16"
+                       false,    // Jalapeno
+                       false,    // Chicken
+                       false,    // Chilli
+                       false,    // Cheese
+                       false,    // Onion
+                       false, ]; // Mushroom
+    
+    // Set by rtFeedback functions
+    var stateCitDiscount     = false;
+    var stateLoyaltyDiscount = false;
+    
+    
+    
+    // Price animation state
+    var animFrequency   = 1000.0 / 30.0; // 30hz
+    var lastLerpedPrice = 0.0;
+
+    
+    
+    
+    
+    
+    
+    //////////////////////////////////////////////
+    // Setup
+    //////////////////////////////////////////////
+    
+    function init() {
+        // Page elements
+        elemDndDropTarget = document.getElementById( "dndDropTarget" );
+        elemPizzaDisplay  = document.getElementById( "pizzaDisplay" );
+        elemPrice         = document.getElementById( "price" );            
+        
+        // Drag and Drop
+        dndInit();
+        
+        // Order state init
+        orderStateInit();
+
+        // Realtime feedback
+        rtFeedbackInit();
+        
+        // Animation
+        animInit();
+        
+        // Cookies
+        loadFormState();
+        loadOrderState();
+        
+        // Update
+        pizzaUpdate();
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    //////////////////////////////////////////////
+    // Animation
+    //////////////////////////////////////////////
+    
+    function animInit() {
+        setInterval( animPrice, animFrequency );
+    }
+    
+    
+    
+    function animPrice() {
+        // Hide when there's no price defined
+        var elem = document.getElementById( "price" );
+        setVisible( elem, pizzaComputePrice() != 0.0 );
+        
+        // Lerp to target
+        var target = pizzaComputePrice();
+        
+        lastLerpedPrice = lerp( lastLerpedPrice, target, 0.35 );
+        
+        if (Math.abs(lastLerpedPrice - target) < 0.05)
+             pizzaSetPrice( target );
+        else pizzaSetPrice( lastLerpedPrice );
+    }
+    
+    
+    
+        
+    
+    
+    
+    //////////////////////////////////////////////
+    // Persistent state management
+    //////////////////////////////////////////////
+    
+    // Get a string of the visible forms.  Only non-empty, valid fields are saved.
+    // Since it would be pretty dumb to store a credit card number
+    // in a cookie, it skips that one.  Autocomplete is also disabled for it.
+    // The hidden ones are intrinsic to the orderState system, not done here.
+    function formSerialise() {
+        var str = "";
+        
+        for (var i=0; i<inputIdArray.length; i++) {
+            var idStr = inputIdArray[i];
+        
+            if ( ! hasSubstr( idStr, "creditCard" )) // Nnnnnnope!
+            if (isInputValid( idStr ))
+            if (getInputValue( idStr ).length != 0) {
+                var elem = document.getElementById( idStr );
+                var esc  = escape( getInputValue(idStr) );
+                str += idStr + "=" + esc + ";";
+            }
+        }
+        
+        return str;
+    }
+    
+    
+    
+    // Set form inputs from previous serialisation
+    function formDeserialise( str ) {
+        while (hasSubstr(str,"=")) {
+            var eqPos   = str.indexOf( "=" );
+            var semiPos = str.indexOf( ";" );
+            var idStr   = str.substring( 0, eqPos );
+            var value   = str.substring( eqPos+1, semiPos );
+            
+            setInputValue( idStr, unescape(value) );
+            
+            str = str.substring( semiPos+1, str.length ); // Chop
+        }
+    }
+    
+    
+    
+    // Load the form from cookie storage.
+    // Also welcomes the user back. :)
+    function loadFormState() {
+        if (cookieExists(cookieNameFormState)) {
+            var str = cookieGet( cookieNameFormState );
+            formDeserialise( str );
+            //alert("Loaded form state from cookie: " + formSerialise());
+            
+            var elemInfo = document.getElementById( "instructionText" );
+                elemInfo.innerHTML = "Welcome back " + getInputValue("name") + "!";
+        }
+    }
+    
+    
+    
+    // Retain state on next load, if there is any.
+    function saveFormState() {
+        var fser = formSerialise();
+        
+        if (fser.length != 0)
+            cookieSet( cookieNameFormState, fser, cookieRememberDays );
+    }
+    
+    
+    
+    // Return current stateOrder array as a string for storage.
+    function orderSerialise() {
+        var str = "";
+        
+        for (var i=0; i<stateOrder.length; i++)
+            str += (stateOrder[i])  ?  "1"  :  "0";
+        
+        return str;
+    }
+    
+    
+    
+    // Set stateOrder array from a previous serialisation.
+    function orderDeserialise( str ) {
+        if (str.length != stateOrder.length) {
+            alert( "ERROR: orderDeserialise length mismatch!  Update aborted." );
+            return;
+        }
+        
+        for (var i=0; i<stateOrder.length; i++) {
+            var chr = str.charAt( i );
+            var on  = (chr == "1");
+            orderSetPartByIndex( i, on );
+        }
+    }
+    
+    
+    function loadOrderState() {    
+        if (cookieExists(cookieNameOrderState)) {
+            var str = cookieGet( cookieNameOrderState );
+            orderDeserialise( str );
+        }
+    }
+
+    function saveOrderState() {
+        // Retain state on next load
+        cookieSet( cookieNameOrderState, orderSerialise(), cookieRememberDays );
+    }
+    
+    
+    
+    
+    
+    
+    
+    //////////////////////////////////////////////
+    // Cookies
+    //////////////////////////////////////////////
+    
+    // Set a cookie.
+    // If the cookie already exists it's overriden with the new value.
+    // ExpireDays is optional.  If not passed, the cookie will expire
+    // when the browser closes.  If expireDays is negative, the cookie
+    // is immediately deleted (TODO: supposedly - I didn't test that yet)
+    function cookieSet( name, value, expireDays ) {
+        var encodedValue = escape( value );
+        var cookieStr    = name + "=" + encodedValue + ";";
+        
+        if (expireDays != undefined) {
+            var dateNow = new Date();
+            var dateExp = new Date();
+            dateExp.setDate( dateNow.getDate() + expireDays );
+            
+            cookieStr += "expires=" + dateExp.toUTCString();
+        }
+        
+        document.cookie = cookieStr;
+    }
+    
+    
+    
+    // Check if a cookie exists.
+    function cookieExists( name ) {
+        var searchFor = name + "=";
+        var index     = document.cookie.indexOf( searchFor );
+        return (index != -1);
+    }
+    
+    
+    
+    // Fetch the value of a cookie.  This is always a string.
+    // If the cookie doesn't exist it returns undefined.
+    function cookieGet( name ) {
+        var cookieJar  = document.cookie;
+        var searchFor  = name + "=";
+        var strLen     = searchFor.length;
+        var indexStart = cookieJar.indexOf( searchFor );
+        
+        if (indexStart == -1)
+            return undefined;
+        
+        var indexEnd = cookieJar.indexOf( ";", indexStart+1 );
+            indexEnd = (indexEnd != -1)  ?  indexEnd  :  cookieJar.length;
+            
+        var encodedValue = cookieJar.substring( indexStart+strLen, indexEnd );
+        
+        return unescape( encodedValue );
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    //////////////////////////////////////////////
+    // Main functions
+    //////////////////////////////////////////////
+    
+    // Initialise the order state.
+    function orderStateInit() {
+        for (var i=0; i<stateOrder.length; i++)
+            orderSetPartByIndex( i, false );
+        
+        orderSetPart( "pizza|" + "baseSize9", true ); // Start with a pizza.
+    }
+    
+    
+    
+    // Add or remove part of an order.
+    // RawDragData format is: "pizza|id".
+    function orderSetPart( rawDragData, state ) {
+        // Main
+        var index    = pizzaDragDataToOrderIndex( rawDragData );
+        var idStr    = pizzaDragDataToIdStr     ( rawDragData );
+        var stateStr = (state)  ?  "yes"  :  "no";
+        
+        if (hasSubstr( idStr, "base" )) {
+            if (state == true) {
+                // Enforce base mutual exclusion
+                stateOrder[ pizzaPartArray.indexOf("baseSize9")  ] = false;
+                stateOrder[ pizzaPartArray.indexOf("baseSize12") ] = false;
+                stateOrder[ pizzaPartArray.indexOf("baseSize16") ] = false;
+            }
+            stateOrder[index] = state;
+            setInputValue( "baseOrder", idStr );
+        } else {
+            stateOrder[index] = state;
+            setInputValue( idStr + "Order", stateStr );
+        }
+        
+        // Update the pizza state
+        pizzaUpdate();
+    }
+    
+    
+    
+    // Same as before, but addresses by index.
+    function orderSetPartByIndex( index, state ) {
+        var dataEquivStr = "pizza|" + pizzaPartArray[index];
+        orderSetPart( dataEquivStr, state );
+    }
+    
+    
+    
+    // Get state based on ID.
+    function orderGetPartStateById( idStr ) {
+        return stateOrder[ pizzaPartArray.indexOf( idStr ) ];
+    }
+    
+    
+    
+    // rawDragData -> element ID string
+    function pizzaDragDataToIdStr( rawDragData ) {
+        var len      = rawDragData.length;
+        var sepIndex = rawDragData.indexOf("|");
+        var str      = rawDragData.substring( sepIndex + 1, len );
+        return str;
+    }
+    
+    
+    
+    // rawDragData -> stateOrder index
+    function pizzaDragDataToOrderIndex( rawDragData ) {
+        var str = pizzaDragDataToIdStr( rawDragData );
+        return pizzaPartArray.indexOf( str );
+    }
+    
+    
+
+    // Call whenever the order state changes.
+    function pizzaUpdate() {
+        pizzaUpdatePrice();
+        pizzaRedraw();
+        dndUpdateUi();
+    }
+    
+    
+    
+    // Set element style stuff for #pizzaDisplay
+    function pizzaRedraw() {
+        var elemBase = document.getElementById( "visBase" );
+        
+        var isBase9  = orderGetPartStateById( "baseSize9"  );
+        var isBase12 = orderGetPartStateById( "baseSize12" );
+        var isBase16 = orderGetPartStateById( "baseSize16" );
+        var scale    = (isBase9*0.75) + (isBase12*0.85) + (isBase16*1.0);
+        var hasBase  = (scale != 0.0);
+        
+        setVisible( elemBase, hasBase );
+        
+        var size     = 400 * scale;
+        var offset   = (400.0 - size) / 2.0;
+        
+        elemBase.style.backgroundSize = size + "px";
+        
+        for (var i=0; i<pizzaPartArray.length; i++) {
+            var str = pizzaPartArray[i];
+            
+            if (hasSubstr( str, "topping" )) {
+                var state = orderGetPartStateById( str );
+                var idStr = "vis" + str;
+                var elem  = document.getElementById( idStr );
+                
+                elem.style.backgroundSize = size + "px";                
+                setVisible( elem, (state && hasBase) );
+            }
+        }
+    }
+    
+    
+    
+    function pizzaUpdatePrice() {
+        // Do nothing.  Was replaced with a continuous animation. 
+        // pizzaSetPrice( pizzaComputePrice() );
+    }
+    
+    
+    
+    // Compute price based on the current state.
+    function pizzaComputePrice() {
+        var isBase9  = orderGetPartStateById( "baseSize9"  );
+        var isBase12 = orderGetPartStateById( "baseSize12" );
+        var isBase16 = orderGetPartStateById( "baseSize16" );
+        
+        if (!(isBase9 || isBase12 || isBase16))
+            return 0.0; // Not a valid pizza.  Price is hidden when it's zero.
+        
+        var basePrice    = (isBase9*9.0) + (isBase12*12.0) + (isBase16*16.0);
+        var toppingPrice = (isBase9)  ?  0.5  :  1.0;
+        var toppingCount = 0;
+        var freeCount    = 2;
+        var discountRate = 1.0 - (0.1 * (stateLoyaltyDiscount + stateCitDiscount));
+        var finalPrice;
+        
+        for (var i=0; i<stateOrder.length; i++) {
+            if (stateOrder[i])
+            if (hasSubstr( pizzaPartArray[i], "topping"))
+                toppingCount++;
+        }
+        
+        if (toppingCount <= freeCount)
+             toppingTotal = 0.0;
+        else toppingTotal = (toppingCount - freeCount) * toppingPrice;
+        
+        finalPrice = (basePrice + toppingTotal) * discountRate;
+        return finalPrice;
+    }
+    
+    
+    
+    // Update the price.  Price should be numerically typed.
+    function pizzaSetPrice( price ) {
+        var str = price.toFixed( 2 ).toString();
+        
+        if (str.length <= 4) // 0.00 -> 00.00
+            str = "0" + str;
+        
+        elemPrice.innerHTML = "&euro; " + str;
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    //////////////////////////////////////////////
+    // Drag and drop
+    //////////////////////////////////////////////
+    
+    function dndInit() {
+        // Add event listeners to the relevant drag/drop elements.
+        
+        var elemArrayTopping  = document.getElementsByClassName( "topping"  );
+        var elemArrayBaseSize = document.getElementsByClassName( "baseSize" );
+        var elemArrayTopdel   = document.getElementsByClassName( "topdel"   );
+        
+        // Draggees
+        var offset    = elemArrayTopping.length;
+        var lengthSum = elemArrayTopping.length + elemArrayBaseSize.length;
+        
+        for (var i=0; i<lengthSum; i++) {
+            var elem;
+            if (i < offset)
+                 elem = elemArrayTopping[i];        
+            else elem = elemArrayBaseSize[i-offset];
+            
+            elem.addEventListener( "dragstart", dndEvStart, false );
+            elem.addEventListener( "dragend",   dndEvEnd,   false );
+        }
+        
+        // Drop target
+        elemDndDropTarget.addEventListener( "drop",      dndEvDrop,  false );
+        elemDndDropTarget.addEventListener( "dragenter", dndEvEnter, false );
+        elemDndDropTarget.addEventListener( "dragover",  dndEvOver,  false );
+        elemDndDropTarget.addEventListener( "dragleave", dndEvLeave, false );
+        
+        // Delete button onclick events
+        for (var i=0; i<elemArrayTopdel.length; i++)
+            elemArrayTopdel[i].addEventListener( "click", dndEvDelButton, false );
+        
+        return true;
+    }
+    
+    
+    
+    // Returns whether the data contains the correct information type.
+    // Most browsers also allow you to drag images and stuff into
+    // the pizza box by default, which messes things up.
+    
+    // NOTE:
+    // In Safari the data is inaccessible and returns undefined.
+    // I'm not working around such a stupid bug.  The entire point
+    // of the dataTransfer object is to access the data in an event!
+    function dndCheckDataType( ev ) {
+        return (ev.dataTransfer.getData("text/plain").indexOf("pizza|") == 0);
+    }
+    
+    
+    
+    // Start dragging.
+    // Target is the dragged element.
+    function dndEvStart( ev ) {
+        ev.target.style.borderStyle = "dashed";
+        ev.target.style.borderColor = colourSelect;
+        ev.target.style.boxShadow   = "inset  0px 0px  2px 2px  black,   0px 0px  16px 1px  " + colourSelect;
+        
+        ev.dataTransfer.setDragImage( ev.target, 96, 24 );
+        ev.dataTransfer.setData( "text/plain", "pizza|" + ev.target.id );
+        
+        elemPizzaDisplay.style.borderStyle = "dashed";
+        elemPizzaDisplay.style.borderColor = colourActive;
+        elemPizzaDisplay.style.boxShadow   = "inset  0px 0px  16px 4px  black,   0px 0px  16px 1px  " + colourActive;
+        
+        return true;
+    }
+    
+    
+    
+    // Drag has ended.
+    // Target is the initially dragged element.
+    function dndEvEnd( ev ) {
+        resetStyle( ev.target        );
+        resetStyle( elemPizzaDisplay );
+        
+        // Update UI
+        dndUpdateUi();
+        
+        // Save state
+        saveOrderState(); // Cookie
+        
+        return true;
+    }
+    
+    
+    
+    // Mouse release while dragging over a drop target.
+    // Target is the drop target.
+    function dndEvDrop( ev ) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        
+        if (ev.target.id != "dndDropTarget")
+            return false;
+        
+        if ( ! dndCheckDataType( ev ))
+            return false;
+        
+        var data = ev.dataTransfer.getData("text/plain");
+        orderSetPart( data, true );
+        
+        return true;
+    }
+    
+    
+    
+    // Mouse enters the dropzone.
+    // Target is the dropzone element.
+    function dndEvEnter( ev ) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        
+        if (ev.target.id != "dndDropTarget")
+            return false;
+        
+        if ( ! dndCheckDataType( ev ))
+            return false;
+        
+        ev.dataTransfer.dropEffect    = "copy";
+        ev.dataTransfer.effectAllowed = "copy";
+        
+        elemPizzaDisplay.style.borderColor = colourSelect;
+        elemPizzaDisplay.style.boxShadow   = "inset  0px 0px  16px 4px  black,"
+                                           + "0px 0px  16px 1px  " + colourSelect;
+        return true;
+    }
+    
+    
+    
+    // Mouse is over the dropzone (triggers repeatedly).
+    // Target is the dropzone element.
+    function dndEvOver( ev ) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        
+        if (ev.target.id != "dndDropTarget")
+            return false;
+        
+        if ( ! dndCheckDataType( ev ))
+            return false;
+        
+        ev.dataTransfer.dropEffect    = "copy";
+        ev.dataTransfer.effectAllowed = "copy";
+        
+        return true;
+    }
+    
+    
+    
+    // Mouse leaves the dropzone.
+    // Target is the dropzone element.
+    function dndEvLeave( ev ) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        
+        if (ev.target.id != "dndDropTarget")
+            return false;
+        
+        if ( ! dndCheckDataType( ev ))
+            return false;
+        
+        elemPizzaDisplay.style.borderColor = colourActive;
+        elemPizzaDisplay.style.boxShadow   = "inset  0px 0px  16px 4px  black,   0px 0px  16px 1px  " + colourActive;
+    
+        return true;
+    }
+    
+    
+    
+    // Called when user presses the X buttons.
+    function dndEvDelButton( ev ) {
+        var idStr     = ev.target.id;
+        var toppingId = idStr.replace( "del", "topping" );
+        var index     = pizzaPartArray.indexOf( toppingId );
+        
+        orderSetPartByIndex( index, false );
+        saveOrderState(); // Cookie
+        
+        dndUpdateUi();
+        
+        return true;
+    }
+    
+    
+    
+    // Set opacity and state variables based on current orderState array.
+    function dndUpdateUi() {
+        for (var i=0; i<pizzaPartArray.length; i++) {
+            var inOrder = stateOrder    [ i ];
+            var idStr   = pizzaPartArray[ i ];
+            
+            if (hasSubstr( idStr, "topping" )) { // If it's a topping, modify the delete button
+                var idStrDel = idStr.replace( "topping", "del" );
+                var elemDel  = document.getElementById( idStrDel );
+                    elemDel.style.opacity = ((inOrder)  ?  alphaEnable  :  alphaDisable);
+            }
+            
+            // Parts present in orderState become disabled
+            var enable = (!inOrder);
+            var elem   = document.getElementById( idStr );
+                elem.style.opacity = ( enable  ?  alphaEnable  :  alphaDisable);
+            
+            // Remove ability to drag if the element gets disabled
+            elem.removeEventListener( "dragstart", dndEvStart, false );
+                
+            if (enable)
+                 elem.   addEventListener( "dragstart", dndEvStart, false );
+            else elem.removeEventListener( "dragstart", dndEvStart, false );
+            
+        }
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    //////////////////////////////////////////////
+    // Validation / Realtime feedback
+    //////////////////////////////////////////////
+    
+    // Get input field value as a string
+    function getInputValue( strElementName ) {
+        return document.forms["orderForm"][strElementName].value;
+    }
+    
+    
+    
+    // Set input field value to str
+    function setInputValue( strElementName, str ) {
+        document.forms["orderForm"][strElementName].value = str;
+    }
+    
+    
+    
+    // Check if input conforms to HTML5 validation params
+    function isInputValid( strElementName ) {
+        return document.forms["orderForm"][strElementName].validity.valid;
+    }
+    
+    
+    
+    // True if string ends with "@mycit.ie".
+    function isEmailCitStudent( str ) {
+        var comp     = "@mycit.ie";
+        var index    = str.indexOf( comp );
+        var indexEnd = index + comp.length;
+        
+        return (index != -1
+            &&  indexEnd == str.length);
+    }
+    
+    
+    
+    // idStr:     Element ID
+    // html:      Message to write on the side
+    // isGood:    Bool
+    // isVisible: Bool, optional, overrides visibility for text
+    function setFeedback( idStr, html, isGood ) {
+        var elemInput = document.getElementById( idStr );
+        var elemText  = document.getElementById( idStr + "Feedback" );
+        
+        // Border / text colour
+        var col = (isGood)  ?  colourGood  :  colourBad;
+        elemText .style.color       = col;
+        elemInput.style.borderColor = col;
+        
+        // Text
+        elemText.innerHTML = html;
+        setVisible( elemText, true );
+    }
+    
+    
+    
+    // Reset feedback to defaults.
+    function resetFeedback( idStr ) {
+        var elemInput = document.getElementById( idStr );
+        var elemText  = document.getElementById( idStr + "Feedback" );
+        
+        setFeedback( idStr, "", false );
+        
+        resetStyle( elemInput );
+        resetStyle( elemText );
+    }
+    
+    
+    
+    // Reset all feedback elements to their defaults.
+    function resetFeedbackAll() {
+        for (var i=0; i<inputIdArray.length; i++)
+            resetFeedback( inputIdArray[i] );
+    }
+    
+    
+    
+    // Start realtime feedback polling
+    function rtFeedbackInit() {
+        var pollFrequency = 200; // milliseconds
+        setInterval( rtFeedbackAll, pollFrequency );
+    }
+    
+    
+    
+    // Called on a timer.
+    // Because of the way HTML5 works, all feedback must be done here.
+    function rtFeedbackAll() {
+        rtFeedbackName();
+        rtFeedbackAddress();
+        rtFeedbackPhone();
+        rtFeedbackEmail();
+        rtFeedbackLoyaltyCard();
+        rtFeedbackCreditCard();
+        
+        // Save any valid inputs
+        saveFormState();
+    }
+    
+    
+    
+    // For simple required fields, the code is the same.
+    function rtFeedbackGeneric( idStr, isGood ) {
+        if (isGood)
+               setFeedback( idStr, "", true );
+        else resetFeedback( idStr );
+        
+        return isGood;
+    }
+    
+    
+    
+    function rtFeedbackName() {
+        rtFeedbackGeneric( "name", validateName() );
+    }
+    
+    
+    
+    function rtFeedbackAddress() {
+        rtFeedbackGeneric( "address", validateAddress() );
+    }
+    
+    
+    
+    function rtFeedbackPhone() {
+        rtFeedbackGeneric( "phone", validatePhone() );
+    }
+    
+    
+    
+    function rtFeedbackEmail() {
+        // Show discount info, validity, etc.
+        var name         = "email";
+        var str          = getInputValue( name );
+        var elemImage    = document.getElementById( name+"Image" );
+        var elemInput    = document.getElementById( name );
+        var isValidEmail = validateEmail() && (str.length != 0);
+        var isCitEmail   = isEmailCitStudent( str );
+        var showImage    = (isValidEmail && isCitEmail);
+        stateCitDiscount = showImage; // State update as well
+        
+        if (isValidEmail) {
+            var strDiscount = (isCitEmail)  ?  "10% discount!"  :  "";
+            setFeedback( name, strDiscount, true );
+        } else {
+            resetFeedback( name );
+        }
+        
+        setVisible( elemImage, showImage ); // CIT image
+    }
+    
+    
+    
+    function rtFeedbackLoyaltyCard() {
+        // Show discount info, validity, etc.
+        var name             = "loyaltyCard"
+        var str              = getInputValue( name );
+        var hasSep           = (str.indexOf("-") != -1);
+        var isValidLength    = (str.length - hasSep == 10);
+        var isValidFormat    = isInputValid( name );
+        var isValidCard      = validateLoyaltyCard();
+        var elemImage        = document.getElementById( name + "Image" );
+        stateLoyaltyDiscount = (isValidLength && isValidFormat && isValidCard);
+        
+        if (isValidLength && isValidFormat) {
+            if (isValidCard)
+                 setFeedback( name, "10% discount!",    true  );
+            else setFeedback( name, "Invalid checksum", false );
+        } else {
+            resetFeedback( name );
+        }
+        
+        var showImage = (isValidLength && isValidCard);
+        setVisible( elemImage, showImage );
+    }
+    
+    
+    
+    // Set text and image for realtime feedback on the credit-card field.
+    function rtFeedbackCreditCard() {
+        var name        = "creditCard";
+        var str         = getInputValue( name );
+        var validFormat =  isInputValid( name );
+        var validNumber = validateCreditCard();
+        var elemImage   = document.getElementById( name + "Image" );
+        var mysteryCard = false;
+        
+        if (validFormat) {
+            // Decide which image to show.
+            switch (str.charAt(0)) {
+                case "4": elemImage.src = imageCardVisa.src;       break;                    
+                case "5": elemImage.src = imageCardMastercard.src; break;                    
+                case "6": elemImage.src = imageCardDiscover.src;   break;
+                default:
+                    elemImage.src = imageCardMystery.src;
+                    mysteryCard   = true;
+                break;
+            }
+        
+            // Bad feedback messages
+            if ( ! validNumber) setFeedback( name, "Invalid checksum",  false );
+            if (mysteryCard)    setFeedback( name, "Unknown card type", false );
+            
+            // Good feedback
+            if (validNumber && !mysteryCard)
+               setFeedback( name, "",  true );
+        } else {   
+            // Show nothing
+            resetFeedback( name );
+        }
+        
+        // When a full and valid card number is entered, show the image feedback.
+        // But also show if it's a mystery.
+        var showImage = ((validFormat && validNumber) || mysteryCard);
+        setVisible( elemImage, showImage );
+    }
+    
+    
+    
+    // Validate everything.  Returns true if every validation step succeeds.
+    
+    // NOTE: in HTML5, this doesn't actually get executed unless the form
+    // is already fully valid according to the defined attribute rules.
+    // Therefore messages in validateWhatever() functions will never be set!
+    // It has to be all realtime.
+    function validateAll() {
+        var validPizza       = validatePizza();        
+        var validName        = validateName();
+        var validAddress     = validateAddress();
+        var validPhone       = validatePhone();
+        var validEmail       = validateEmail();
+        var validLoyaltyCard = validateLoyaltyCard();
+        var validCreditCard  = validateCreditCard();
+        
+        var valid = (validPizza
+                  && validName
+                  && validAddress
+                  && validPhone
+                  && validEmail
+                  && validLoyaltyCard
+                  && validCreditCard);
+        
+        if (valid) {
+            // TODO: save to the order history so user can pick it again.
+            // Didn't have time to do this.
+        }
+        
+        return valid;
+    }
+    
+    
+    
+    function validatePizza()
+    {
+        // Tests if the pizza has a base.
+        // You can have a pizza with just tomato sauce and cheese if you want.
+        var hasBase = (    orderGetPartStateById( "baseSize9"  )
+                        || orderGetPartStateById( "baseSize12" )
+                        || orderGetPartStateById( "baseSize16" ) );
+                        
+        var valid = hasBase;
+        
+        if ( ! valid) {
+            elemPizzaDisplay.style.borderColor     = colourBad;
+            elemPizzaDisplay.style.backgroundColor = colourBadInner;
+        } else {
+            resetStyle( elemPizzaDisplay );
+        }
+        
+        return valid;
+    }
+    
+    
+    
+    function validateName() {       
+        return isInputValid( "name" );
+    }
+    
+    
+    
+    function validateAddress() {
+        return isInputValid( "address" );
+    }
+    
+    
+    
+    function validatePhone() {
+        return isInputValid( "phone" );
+    }
+    
+    
+    
+    function validateEmail() {
+        return isInputValid( "email" );
+    }
+    
+    
+    
+    // The custom checksum.
+    // 9 digits + check letter.
+    // Modulo 17 lookup on mod of the 9 digits.
+    // Optional separator '-' after digits.
+    // Case insensitive.
+    // Valid examples: 100000001-A, 170000016Z  
+    function validateLoyaltyCard() {
+        var name   = "loyaltyCard";
+        var str    = getInputValue( name );
+        var hasSep = (str.indexOf("-") != -1); // Evals to 0 or 1
+        
+        
+        if (str.length == 0) {
+            // The loyalty card is optional, so it being empty is fine.
+            return true;
+        } else if (str.length - hasSep != 10) {
+            // Not fine if there's crap in there though.
+            return false;
+        }
+        
+        // Digits
+        var numPartStr = str.substring( 0, 9 );
+        if ( ! isAllDigits( numPartStr ))
+            return false;
+        
+        // Modulus check
+        var numPart    = parseInt( numPartStr, 10 );
+        var checkDigit = str.charAt( 9 + hasSep ).toUpperCase();
+        var modLookup  = "ABCDEFGHJKLMNPRTZ";
+        var mod        = numPart % 17;
+        
+        return (checkDigit == modLookup.charAt( mod ));
+    }
+    
+    
+    
+    function validateCreditCard( verbose ) {
+        // Luhn check.
+        var name = "creditCard";
+        var str  = getInputValue( name );
+        
+        // Length
+        if (str.length != 16)
+            return false;
+        
+        // Digits
+        if ( ! isAllDigits(str))
+            return false;
+        
+        // Luhn
+        var acc = 0; // Accumulator for digit sums
+        for (var i=0; i<str.length; i++) {
+            var num    = parseInt( str.charAt(i), 10 );
+            var mul    = num * 2;
+            var mulSum = (mul>=10)  ?  mul-9  :  mul;
+            
+            acc += (i % 2 == 0)  ?  mulSum  :  num;
+        }
+        
+        return (acc % 10 == 0);
+    }
+    
+
+    
+    
+    
+    //////////////////////////////////////////////
+    // Utility functions
+    //////////////////////////////////////////////
+    
+    // Linearly interpolate from A to B by fraction F.
+    function lerp( a, b, f ) {
+        return a + ((b-a) * f);
+    }
+    
+    
+    
+    // Transform linear range (0,1) to hermite curve in same range.
+    function hermite( x ) {
+        return x * x * (3.0 - (2.0 * x));
+    }
+    
+    
+    
+    // Interpolate using a hermite curve.
+    // Transition is similar to a cosine curve.
+    function herp( a, b, f ) {
+        return lerp( a, b, hermite(f) );
+    }
+
+    
+    
+    // Load an image.
+    function imagePreload( file ) {
+        var    img     = new Image();
+               img.src = file;
+        return img;
+    }
+    
+    
+    
+    // Set visibility.
+    function setVisible( elemRef, isVisible ) {
+        elemRef.style.visibility = (isVisible)  ?  "visible"  :  "hidden";
+    }
+    
+    
+    
+    // Reset element to the CSS defined style, as opposed to the JS-defined one.
+    function resetStyle( elemRef ) {
+        elemRef.style.cssText = "";
+    }
+    
+    
+    
+    // Check if a string is composed exclusively of numerical chars
+    // and is >= length 1.
+    function isAllDigits( str ) {
+        for (var i=0; i<str.length; i++) {
+            var c = str.charAt(i);
+            
+            if ((c < '0')  ||  (c > '9'))
+                return false;
+        }
+        
+        return (str.length >= 1);
+    }
+    
+    
+    
+    // Check if string contains given substring.
+    function hasSubstr( str, sub ) {
+        return (-1 != str.indexOf(sub));
+    }
+    
+    
+    
+    
+
+    //]]> 
+    </script>
+</head>
+
+
+
+<body onload="init();">
+
+    <div id="pageOuterContainer" >
+    
+        <div id="pageInnerContainer" >
+        
+            <!-- Header -->
+            <header>
+                <h1>Pizza Time</h1>
+            </header>
+            
+            
+            
+            
+            
+            <!-- Instructions -->
+            <div id="instructions">
+                <p>
+                    <span>
+                        i
+                    </span>
+                    
+                    <em id="instructionText">
+                        Drag and drop a base and toppings to create your pizza!
+                    </em>
+                </p>
+            </div>
+
+            
+            
+            
+            
+            <!-- Pizza -->
+            <div id="pizzaContainer" >
+                <div id="dndContainer">
+                    <!-- Pizza graphic -->
+                    <div id="pizzaDisplay" >
+                        <div class="vis" id="visBase"           ></div>
+                        <div class="vis" id="vistoppingCheese"  ></div>
+                        <div class="vis" id="vistoppingJalapeno"></div>
+                        <div class="vis" id="vistoppingChilli"  ></div>
+                        <div class="vis" id="vistoppingChicken" ></div>
+                        <div class="vis" id="vistoppingOnion"   ></div>
+                        <div class="vis" id="vistoppingMushroom"></div>
+                    </div>
+                    <!-- Drop target, overlaid -->
+                    <div id="dndDropTarget">
+                    </div>
+                </div>
+                
+                <!-- Toppings -->
+                <div class="toppingContainer" >                        
+                    <div class="topping" id="toppingJalapeno" draggable="true" ></div>
+                    <div class="topdel"  id="delJalapeno" ></div>
+                </div>
+                
+                <div class="toppingContainer" >
+                    <div class="topping" id="toppingChicken"  draggable="true" ></div>
+                    <div class="topdel"  id="delChicken" ></div>
+                </div>
+                
+                <div class="toppingContainer" >
+                    <div class="topping" id="toppingChilli"   draggable="true" ></div>
+                    <div class="topdel"  id="delChilli" ></div>
+                </div>
+                
+                <div class="toppingContainer" >
+                    <div class="topping" id="toppingCheese"   draggable="true" ></div>
+                    <div class="topdel"  id="delCheese" ></div>
+                </div>
+                
+                <div class="toppingContainer" >
+                    <div class="topping" id="toppingOnion"    draggable="true" ></div>
+                    <div class="topdel"  id="delOnion" ></div>
+                </div>
+                
+                <div class="toppingContainer" >
+                    <div class="topping" id="toppingMushroom" draggable="true" ></div>
+                    <div class="topdel"  id="delMushroom" ></div>
+                </div>
+                
+                <!-- Split -->
+                <div class="floatSplitter"></div>
+                
+                <!-- Sizes -->
+                <div class="baseSize" id="baseSize9"  draggable="true" > <span> 9&quot;  </span> </div>
+                <div class="baseSize" id="baseSize12" draggable="true" > <span> 12&quot; </span> </div>
+                <div class="baseSize" id="baseSize16" draggable="true" > <span> 16&quot; </span> </div>
+                
+                <!-- Price -->
+                <div id="price">&euro; 00.00 </div>
+            </div>
+            
+            
+            
+            
+            
+            <!-- Split -->
+            <div class="floatSplitter"></div>
+            
+            
+            
+            
+            
+            <!-- Form -->
+            <form id      ="orderForm"
+                  onsubmit="return validateAll();"
+                  method  ="get"
+                  action  ="http://atlantis.cit.ie/displayvalues.php" >
+            
+                <fieldset>
+                
+                    <legend>Where to?</legend>
+                    
+                    <div id="formLabels">
+                        <div class="labelContainer"> 
+                            <label for="name">        Name          </label>
+                            <label for="address">     Address       </label>
+                            <label for="phone">       Phone         </label>
+                            <label for="email">       Email         </label>
+                            <label for="loyaltyCard"> Loyalty card# </label>
+                            <label for="creditCard">  Credit card#  </label>
+                        </div>
+                    </div>
+                    
+                    <div id="formInputs">
+                        <div class="feedbackContainer">
+                            <input id      ="name"
+                                   name    ="name"
+                                   class   ="textInput"
+                                   type    ="text" 
+                                   tabindex="1"
+                                   title   ="Name (no special characters allowed)"
+                                   pattern ="^(?:\w+(?:\s+)?)+$"
+                                   required />
+                            <span  id   ="nameFeedback"
+                                   class="feedback">
+                            </span>
+                            <br/>
+                        </div>
+                        
+                        <div class="feedbackContainer">
+                            <input id      ="address"
+                                   name    ="address"
+                                   class   ="textInput"
+                                   type    ="text"
+                                   tabindex="2"
+                                   title   ="Address (separate using comma)"
+                                   pattern ="^(?:\w+\,?(?:\s+)?)+$"
+                                   required />
+                            <span id   ="addressFeedback"
+                                  class="feedback">
+                            </span>
+                            <br/>
+                        </div>
+                        
+                        <div class="feedbackContainer">
+                            <input id      ="phone"
+                                   name    ="phone"
+                                   class   ="textInput"
+                                   type    ="tel"
+                                   tabindex="3"
+                                   title   ="Phone number (Irish mobile or Cork landline)"
+                                   pattern ="^(?:\((?:0|\+353)(?:21|8[35679])\)|(?:0|\+353)(?:21|8[35679]))[\s-]?\d{3}[\s-]?\d{4}$"
+                                   required />
+                            <span id   ="phoneFeedback"
+                                  class="feedback">
+                            </span>
+                            <br/>
+                        </div>
+                        
+                        <div class="feedbackContainer">
+                            <input id      ="email"
+                                   name    ="email"
+                                   class   ="textInput"
+                                   type    ="email"
+                                   title   ="Email (CIT students get a discount!)"
+                                   tabindex="4" />
+                            <img id    ="emailImage"
+                                 src   ="images\emailCit.png"
+                                 width ="18"
+                                 height="18"
+                                 alt   ="" />
+                            <span id   ="emailFeedback"
+                                  class="feedback">
+                            </span>
+                            <br/>
+                        </div>
+                        
+                        <div class="feedbackContainer">
+                            <input id      ="loyaltyCard"
+                                   name    ="loyaltyCard"
+                                   class   ="textInput"
+                                   type    ="text"
+                                   tabindex="5"
+                                   title   ="10-character loyalty card number with optional separator"
+                                   pattern ="^\d{9}\-?[a-zA-z]{1}$" />
+                            <img id    ="loyaltyCardImage"
+                                 src   ="images\tickGreen.png"
+                                 width ="18"
+                                 height="18"
+                                 alt   ="" />
+                            <span id   ="loyaltyCardFeedback" 
+                                  class="feedback">
+                            </span>
+                            <br/>
+                        </div>
+                        
+                        <div class="feedbackContainer">
+                            <input id="creditCard"
+                                   name="creditCard"
+                                   class="textInput"
+                                   type="text"
+                                   tabindex="6" 
+                                   title="16-digit credit card number"
+                                   autocomplete="off"
+                                   pattern="^\d{16}$"
+                                   required/>
+                            <img id    ="creditCardImage"
+                                 src   ="images\cardMystery.png"
+                                 width ="30"
+                                 height="18"
+                                 alt   ="" />
+                            <span id   ="creditCardFeedback"
+                                  class="feedback">
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden fields for DnD ordering -->
+                    <div id="hiddenOrderFields">
+                        <input id  ="baseOrder" 
+                               name="baseOrder"
+                               type="text" />
+                    
+                        <input id  ="toppingJalapenoOrder" 
+                               name="toppingJalapenoOrder"
+                               type="text" />
+                               
+                        <input id  ="toppingChickenOrder" 
+                               name="toppingChickenOrder"
+                               type="text" />
+                               
+                        <input id  ="toppingChilliOrder" 
+                               name="toppingChilliOrder"
+                               type="text" />
+                        
+                        <input id  ="toppingCheeseOrder" 
+                               name="toppingCheeseOrder"
+                               type="text" />
+                               
+                        <input id  ="toppingOnionOrder" 
+                               name="toppingOnionOrder"
+                               type="text" />
+                        
+                        <input id  ="toppingMushroomOrder" 
+                               name="toppingMushroomOrder"
+                               type="text" />
+                    </div>
+                    
+                </fieldset>
+
+                <!-- Order button -->
+                <input id      ="submitButton" 
+                       type    ="submit"
+                       value   ="Order"
+                       tabindex="7" />
+                <br/>
+            </form>                
+        
+        </div> <!-- Page inner container -->
+    
+    </div> <!-- Page outer container -->
+    
+</body>
+    
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
