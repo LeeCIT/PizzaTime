@@ -15,14 +15,11 @@
      Active:    rgb(251,112,85)  // Low saturation orange
      Select:    rgb(239,194,55)  // Gold
      Off-white: rgb(253,249,247)
-     
-     TODO: add glow effects using boxShadow on DnD dropzone
 */
 
 
 
-body
-{
+body {
     font-family:      "calibri", "trebuchet ms", "helvetica", sans-serif;
     background-color: rgb(24,8,16);
     color:            white;
@@ -32,8 +29,7 @@ body
 
 
 
-#pageOuterContainer
-{
+#pageOuterContainer {
     width:  720px;
     margin: auto;
     
@@ -47,8 +43,7 @@ body
 
 
 
-#pageInnerContainer
-{
+#pageInnerContainer {
     margin-left:  1em;
     margin-right: 1em;
 }
@@ -57,15 +52,13 @@ body
 
 
 
-header
-{
+header {
     display:       block;
     border-bottom: 5px solid rgb(79,17,51);
 }
 
 
-header > h1
-{
+header > h1 {
     margin: -0.1em; /* Compact it a bit */
     
     font-size:    6em;
@@ -81,8 +74,7 @@ header > h1
 
 
 
-#instructions
-{
+#instructions {
     margin-bottom: 1em;
     font-weight:   bold;
     text-shadow:   0px 0px  3px  black;
@@ -114,8 +106,7 @@ header > h1
 
 
 
-#pizzaDisplay
-{
+#pizzaDisplay {
     position:         relative;
     float:            left;
     width:            400px;
@@ -127,8 +118,7 @@ header > h1
     box-shadow:    inset  0px 0px  16px 4px  black;  /* mode  xoff yoff  radiusFade, radiusSolid */
 }
 
-#pizzaDisplay > .vis
-{
+#pizzaDisplay > .vis {
     position: absolute;
     width:    400px;
     height:   400px;
@@ -138,8 +128,7 @@ header > h1
     background-position: center;
 }
 
-#dndDropTarget
-{
+#dndDropTarget {
     position: absolute;
     width:    400px;
     height:   400px;
@@ -168,8 +157,7 @@ header > h1
 
 
 
-.toppingContainer
-{
+.toppingContainer {
     float: right;
     clear: right;
 }
@@ -177,16 +165,14 @@ header > h1
 
 
 .topdel,
-.topping
-{
+.topping {
     float:      left;
     margin-top: 12px;
 }
 
 
 
-.topdel
-{
+.topdel {
     float:       left;
     width:       48px;
     height:      48px;
@@ -202,14 +188,12 @@ header > h1
 
 .topdel:hover,
 .topping:hover,
-.baseSize:hover
-{
+.baseSize:hover {
     border-color: rgb(251,112,85);
     box-shadow:   inset  0px 0px  2px 2px  black,  0px 0px  8px 1px rgb(251,112,85);
 }
 
-.topdel:hover
-{
+.topdel:hover {
     background-image: url('images/deleteToppingHover.png');
 }
 
@@ -217,8 +201,7 @@ header > h1
 
 .topdel,
 .topping,
-.baseSize
-{
+.baseSize {
     border:        solid 3px rgb(193,29,68);
     border-radius: 24px;
     box-shadow:    inset  0px  0px  4px  4px  black;
@@ -227,8 +210,7 @@ header > h1
 
 
 .topping,
-.baseSize
-{
+.baseSize {
     float:  left;
     width:  192px;
     height: 48px;
@@ -248,8 +230,7 @@ header > h1
 
 
 
-.baseSize
-{
+.baseSize {
     float:         left;
     clear:         right;
     width:         112px;
@@ -276,8 +257,7 @@ header > h1
 
 
 
-#price /* Dynamic price */
-{
+#price { /* Dynamic price */
     visibility:  hidden;
 
     float:       left;
@@ -293,8 +273,7 @@ header > h1
 
 
 
-.floatSplitter
-{
+.floatSplitter {
     clear: both;
 }
 
@@ -302,8 +281,7 @@ header > h1
 
 
 
-form
-{
+form {
     padding-top:   1em;
     margin-bottom: 2em;
     border-top:    5px solid rgb(79,17,51);
@@ -311,8 +289,7 @@ form
 
 
 
-form #formLabels
-{
+form #formLabels {
     float:         left;
     padding-right: 0.25em;
     text-align:    right;
@@ -320,15 +297,13 @@ form #formLabels
 
 
 
-form #formInputs
-{
+form #formInputs {
     float: left;
 }
 
 
 
-form .feedback
-{
+form .feedback {
     font-weight: normal;
     font-style:  italic;
     font-size:   0.5em;
@@ -338,8 +313,7 @@ form .feedback
 
 
 
-form label
-{
+form label {
     display: block;
     padding: 0.25em;
     
@@ -349,8 +323,7 @@ form label
 
 
 
-form .textInput
-{
+form .textInput {
     width:   240px;
     padding: 0.25em;
 
@@ -365,28 +338,24 @@ form .textInput
 }
 
 form .textInput:hover, /* Made more specific to override :invalid */
-form .textInput:focus
-{
+form .textInput:focus {
     background-color: rgb(55,15,40);
     border-color:     rgb(251,112,85);
 }
 
-form .textInput:focus
-{
+form .textInput:focus {
     box-shadow:       inset  0px 0px  2px 2px  rgba(0,0,0,0.5);
     background-color: rgb(55,15,40);
     border-color:     rgb(239,194,55);
 }
 
-form .textInput:invalid /* HTML5 validation */
-{
+form .textInput:invalid { /* HTML5 validation */
     border-color: red;
 }
 
 
 
-form > fieldset
-{
+form > fieldset {
     padding-bottom: 0.8em;
     font-size:      2.5em;
     line-height:    0.75em;
@@ -398,15 +367,13 @@ form > fieldset
 
 
 
-#hiddenOrderFields
-{
+#hiddenOrderFields {
     display: none;
 }
 
 
 
-.feedbackContainer
-{
+.feedbackContainer {
     position: relative; /* Makes absolute positioned child elements relative to this one */
 }
 
@@ -414,8 +381,7 @@ form > fieldset
 
 .feedbackContainer > img,
 .feedbackContainer > img,
-.feedbackContainer > img
-{
+.feedbackContainer > img {
     visibility: hidden;
     position:   absolute;
     left:       +5.4em;
@@ -423,15 +389,13 @@ form > fieldset
 }
 
 #emailImage,
-#loyaltyCardImage
-{
+#loyaltyCardImage {
     left: +5.7em;
 }
 
 
 
-#submitButton
-{
+#submitButton {
     float:         right;
     clear:         both;
     width:         192px;
@@ -450,16 +414,14 @@ form > fieldset
 }
 
 #submitButton:hover,
-#submitButton:focus
-{
+#submitButton:focus {
     color:            rgb(255,255,255);
     background-color: rgb(90,27,61);
     border-color:     rgb(239,194,55);
     box-shadow:       0px 0px  16px 2px  rgba(239,194,55,0.25);
 }
 
-#submitButton:active
-{
+#submitButton:active {
     color:            black;
     background-color: rgb(239,194,55);
     border-color:     rgb(90,27,61);
